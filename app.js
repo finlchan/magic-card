@@ -6,6 +6,7 @@ const IMAGES = [
   { src: "photo/Clash Royale/PEKKA.jpeg", alt: "PEKKA" },
   { src: "photo/Clash Royale/Skeleton Dragons (2).jpeg", alt: "Skeleton Dragons" },
   { src: "photo/Clash Royale/Three Musketeers.jpeg", alt: "Three Musketeers" },
+  { src: "photo/Clash Royale/Witch.jpeg", alt: "Witch" },
 ];
 
 const DURATION = 0.55;
@@ -19,7 +20,19 @@ const root = document.documentElement;
 
 let activeCard = null;
 let isAnimating = false;
+let animatingTimer = null;
 const paletteCache = new WeakMap();
+
+function setAnimating(value) {
+  isAnimating = value;
+  clearTimeout(animatingTimer);
+  if (value) {
+    // Prevent clicks from getting permanently stuck if an animation is interrupted.
+    animatingTimer = setTimeout(() => {
+      isAnimating = false;
+    }, DURATION * 1000 + 400);
+  }
+}
 
 function softPastel(r, g, b, amount = 0.62) {
   return [
@@ -44,6 +57,15 @@ function rgb(r, g, b, a = 1) {
 function extractPalette(img) {
   if (paletteCache.has(img)) return paletteCache.get(img);
 
+  try {
+    return extractPaletteUnsafe(img);
+  } catch (error) {
+    console.warn("Palette extract failed:", error);
+    return null;
+  }
+}
+
+function extractPaletteUnsafe(img) {
   const size = 64;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -131,6 +153,7 @@ function extractPalette(img) {
 }
 
 function applyTheme(palette) {
+  if (!palette) return;
   root.style.setProperty("--bg-a", palette.bgA);
   root.style.setProperty("--bg-b", palette.bgB);
   root.style.setProperty("--bg-c", palette.bgC);
@@ -138,6 +161,25 @@ function applyTheme(palette) {
   root.style.setProperty("--muted", palette.muted);
   root.style.setProperty("--accent", palette.accent);
   root.style.setProperty("--overlay", palette.overlay);
+}
+
+function readCardVars(card) {
+  return {
+    ratio: card.style.getPropertyValue("--card-ratio"),
+    accent: card.style.getPropertyValue("--accent"),
+  };
+}
+
+function restoreCardVars(card, vars) {
+  if (vars.ratio) card.style.setProperty("--card-ratio", vars.ratio);
+  if (vars.accent) card.style.setProperty("--accent", vars.accent);
+}
+
+/** Flip leaves inline layout styles that block .is-open CSS — wipe them. */
+function clearFlipProps(card) {
+  const vars = readCardVars(card);
+  gsap.set(card, { clearProps: "all" });
+  restoreCardVars(card, vars);
 }
 
 function fitCardFrame(img, slot, card) {
@@ -174,12 +216,17 @@ function buildGallery() {
         fitCardFrame(img, li, button);
       }
       const palette = extractPalette(img);
-      button.style.setProperty("--accent", palette.accent);
-      if (!activeCard) applyTheme(palette);
+      if (palette) {
+        button.style.setProperty("--accent", palette.accent);
+        if (!activeCard) applyTheme(palette);
+      }
     });
 
     button.appendChild(img);
-    button.addEventListener("click", () => toggleCard(button));
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      toggleCard(button);
+    });
     button.addEventListener("mouseenter", () => {
       if (activeCard || !img.complete) return;
       applyTheme(extractPalette(img));
@@ -192,9 +239,14 @@ function buildGallery() {
   gallery.appendChild(fragment);
 }
 
-function openCard(card) {
+function themeFromCard(card) {
   const img = card.querySelector("img");
   if (img?.complete) applyTheme(extractPalette(img));
+}
+
+function openCard(card) {
+  themeFromCard(card);
+  clearFlipProps(card);
 
   const state = Flip.getState(card);
   card.classList.add("is-open");
@@ -203,14 +255,17 @@ function openCard(card) {
   overlay.setAttribute("aria-hidden", "false");
   activeCard = card;
 
+  // Force layout so Flip measures the real centered size.
+  void card.offsetWidth;
+
   Flip.from(state, {
     duration: DURATION,
     ease: EASE,
     absolute: true,
     nested: true,
     onComplete: () => {
-      gsap.set(card, { clearProps: "transform" });
-      isAnimating = false;
+      clearFlipProps(card);
+      setAnimating(false);
     },
   });
 }
@@ -228,26 +283,28 @@ function closeCard(card) {
     absolute: true,
     nested: true,
     onComplete: () => {
-      gsap.set(card, { clearProps: "all" });
+      clearFlipProps(card);
       activeCard = null;
-      isAnimating = false;
+      setAnimating(false);
     },
   });
 }
 
 function toggleCard(card) {
   if (isAnimating) return;
-  isAnimating = true;
+  setAnimating(true);
 
   if (activeCard && activeCard !== card) {
     const previous = activeCard;
+    clearFlipProps(previous);
+    clearFlipProps(card);
+    themeFromCard(card);
+
     const state = Flip.getState([previous, card]);
     previous.classList.remove("is-open");
     card.classList.add("is-open");
     activeCard = card;
-
-    const img = card.querySelector("img");
-    if (img?.complete) applyTheme(extractPalette(img));
+    void card.offsetWidth;
 
     Flip.from(state, {
       duration: DURATION,
@@ -255,9 +312,9 @@ function toggleCard(card) {
       absolute: true,
       nested: true,
       onComplete: () => {
-        gsap.set(card, { clearProps: "transform" });
-        gsap.set(previous, { clearProps: "all" });
-        isAnimating = false;
+        clearFlipProps(card);
+        clearFlipProps(previous);
+        setAnimating(false);
       },
     });
     return;
@@ -273,14 +330,18 @@ function toggleCard(card) {
 
 overlay.addEventListener("click", () => {
   if (!activeCard || isAnimating) return;
-  isAnimating = true;
+  setAnimating(true);
   closeCard(activeCard);
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || !activeCard || isAnimating) return;
-  isAnimating = true;
+  setAnimating(true);
   closeCard(activeCard);
 });
 
-buildGallery();
+if (typeof gsap === "undefined" || typeof Flip === "undefined") {
+  console.error("GSAP Flip failed to load — lightbox disabled.");
+} else {
+  buildGallery();
+}
