@@ -1,13 +1,13 @@
 const IMAGES = [
-  { src: "photo/Clash Royale/Giant Skeleton.jpeg", alt: "Giant Skeleton" },
-  { src: "photo/Clash Royale/Graveyard (2).jpeg", alt: "Graveyard" },
-  { src: "photo/Clash Royale/Heal Spirit.jpeg", alt: "Heal Spirit" },
-  { src: "photo/Clash Royale/HOG RIDER.jpeg", alt: "Hog Rider" },
-  { src: "photo/Clash Royale/PEKKA.jpeg", alt: "PEKKA" },
-  { src: "photo/Clash Royale/Skeleton Dragons (2).jpeg", alt: "Skeleton Dragons" },
-  { src: "photo/Clash Royale/Three Musketeers.jpeg", alt: "Three Musketeers" },
-  { src: "photo/Clash Royale/Witch.jpeg", alt: "Witch" },
-  { src: "photo/Clash Royale/Rascals.jpeg", alt: "Rascals" },
+  { src: "photo/Clash Royale/Giant Skeleton.jpeg", alt: "Giant Skeleton", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Graveyard (2).jpeg", alt: "Graveyard", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Heal Spirit.jpeg", alt: "Heal Spirit", category: "Clash Royale" },
+  { src: "photo/Clash Royale/HOG RIDER.jpeg", alt: "Hog Rider", category: "Clash Royale" },
+  { src: "photo/Clash Royale/PEKKA.jpeg", alt: "PEKKA", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Skeleton Dragons (2).jpeg", alt: "Skeleton Dragons", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Three Musketeers.jpeg", alt: "Three Musketeers", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Witch.jpeg", alt: "Witch", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Rascals.jpeg", alt: "Rascals", category: "Clash Royale" },
 ];
 
 const DURATION = 0.55;
@@ -15,9 +15,15 @@ const EASE = "power2.inOut";
 
 gsap.registerPlugin(Flip);
 
-const gallery = document.getElementById("gallery");
+const galleryWrap = document.getElementById("gallery-wrap");
 const overlay = document.getElementById("overlay");
+const searchInput = document.getElementById("search-input");
+const categoryFilters = document.getElementById("category-filters");
 const root = document.documentElement;
+
+let selectedCategory = "all";
+let searchQuery = "";
+const cardEntries = [];
 
 let activeCard = null;
 let isAnimating = false;
@@ -194,12 +200,111 @@ function fitCardFrame(img, slot, card) {
   img.style.objectPosition = "center center";
 }
 
-function buildGallery() {
+function getCategories() {
+  return [...new Set(IMAGES.map((item) => item.category))];
+}
+
+function buildCategoryFilters() {
+  const categories = getCategories();
   const fragment = document.createDocumentFragment();
 
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "category-chip is-active";
+  allBtn.dataset.category = "all";
+  allBtn.textContent = "All";
+  fragment.appendChild(allBtn);
+
+  categories.forEach((category) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "category-chip";
+    btn.dataset.category = category;
+    btn.textContent = category;
+    fragment.appendChild(btn);
+  });
+
+  categoryFilters.appendChild(fragment);
+  categoryFilters.addEventListener("click", (event) => {
+    const btn = event.target.closest(".category-chip");
+    if (!btn) return;
+    selectedCategory = btn.dataset.category;
+    categoryFilters.querySelectorAll(".category-chip").forEach((chip) => {
+      chip.classList.toggle("is-active", chip === btn);
+    });
+    applyFilters();
+  });
+}
+
+function matchesFilters(item) {
+  const query = searchQuery.trim().toLowerCase();
+  const categoryOk =
+    selectedCategory === "all" || item.category === selectedCategory;
+  const queryOk =
+    !query ||
+    item.alt.toLowerCase().includes(query) ||
+    item.category.toLowerCase().includes(query);
+  return categoryOk && queryOk;
+}
+
+function applyFilters() {
+  if (activeCard) {
+    activeCard.classList.remove("is-open");
+    clearFlipProps(activeCard);
+    document.body.classList.remove("is-lightbox");
+    overlay.classList.remove("is-visible");
+    overlay.setAttribute("aria-hidden", "true");
+    activeCard = null;
+    setAnimating(false);
+  }
+
+  const visible = IMAGES.filter(matchesFilters);
+  const byCategory = new Map();
+
+  visible.forEach((item) => {
+    if (!byCategory.has(item.category)) byCategory.set(item.category, []);
+    byCategory.get(item.category).push(item);
+  });
+
+  galleryWrap.replaceChildren();
+
+  if (!visible.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No cards found";
+    galleryWrap.appendChild(empty);
+    return;
+  }
+
+  byCategory.forEach((items, category) => {
+    const section = document.createElement("section");
+    section.className = "category-section";
+
+    const title = document.createElement("h2");
+    title.className = "category-title";
+    title.textContent = category;
+    section.appendChild(title);
+
+    const list = document.createElement("ul");
+    list.className = "gallery";
+    list.setAttribute("role", "list");
+
+    items.forEach((item) => {
+      const entry = cardEntries.find((c) => c.item === item);
+      if (entry) list.appendChild(entry.slot);
+    });
+
+    section.appendChild(list);
+    galleryWrap.appendChild(section);
+  });
+}
+
+function buildGallery() {
   IMAGES.forEach((item) => {
     const li = document.createElement("li");
     li.className = "card-slot";
+    li.dataset.category = item.category;
+    li.dataset.name = item.alt.toLowerCase();
 
     const button = document.createElement("button");
     button.type = "button";
@@ -234,10 +339,15 @@ function buildGallery() {
     });
 
     li.appendChild(button);
-    fragment.appendChild(li);
+    cardEntries.push({ item, slot: li, card: button });
   });
 
-  gallery.appendChild(fragment);
+  buildCategoryFilters();
+  searchInput.addEventListener("input", () => {
+    searchQuery = searchInput.value;
+    applyFilters();
+  });
+  applyFilters();
 }
 
 function themeFromCard(card) {

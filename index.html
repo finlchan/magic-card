@@ -13,13 +13,27 @@
   <div class="page-bg" aria-hidden="true"></div>
   <div class="overlay" id="overlay" aria-hidden="true"></div>
 
+  <aside class="search-panel" aria-label="Card search">
+    <label class="search-field" for="search-input">
+      <span class="search-label">Search</span>
+      <input
+        id="search-input"
+        type="search"
+        placeholder="Search cards..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </label>
+    <div class="category-filters" id="category-filters" role="group" aria-label="Categories"></div>
+  </aside>
+
   <main class="stage">
     <header class="brand">
       <h1>Magic Card</h1>
       <p>點擊卡片，放大觀看</p>
     </header>
 
-    <ul class="gallery" id="gallery" role="list"></ul>
+    <div class="gallery-wrap" id="gallery-wrap"></div>
   </main>
 
   <footer class="site-footer">
