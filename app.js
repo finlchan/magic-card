@@ -1,0 +1,286 @@
+const IMAGES = [
+  { src: "photo/Clash Royale/Giant Skeleton.jpeg", alt: "Giant Skeleton" },
+  { src: "photo/Clash Royale/Graveyard (2).jpeg", alt: "Graveyard" },
+  { src: "photo/Clash Royale/Heal Spirit.jpeg", alt: "Heal Spirit" },
+  { src: "photo/Clash Royale/HOG RIDER.jpeg", alt: "Hog Rider" },
+  { src: "photo/Clash Royale/PEKKA.jpeg", alt: "PEKKA" },
+  { src: "photo/Clash Royale/Skeleton Dragons (2).jpeg", alt: "Skeleton Dragons" },
+  { src: "photo/Clash Royale/Three Musketeers.jpeg", alt: "Three Musketeers" },
+];
+
+const DURATION = 0.55;
+const EASE = "power2.inOut";
+
+gsap.registerPlugin(Flip);
+
+const gallery = document.getElementById("gallery");
+const overlay = document.getElementById("overlay");
+const root = document.documentElement;
+
+let activeCard = null;
+let isAnimating = false;
+const paletteCache = new WeakMap();
+
+function softPastel(r, g, b, amount = 0.62) {
+  return [
+    Math.round(r + (255 - r) * amount),
+    Math.round(g + (255 - g) * amount),
+    Math.round(b + (255 - b) * amount),
+  ];
+}
+
+function deepen(r, g, b, amount = 0.42) {
+  return [
+    Math.round(r * (1 - amount)),
+    Math.round(g * (1 - amount)),
+    Math.round(b * (1 - amount)),
+  ];
+}
+
+function rgb(r, g, b, a = 1) {
+  return a === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+function extractPalette(img) {
+  if (paletteCache.has(img)) return paletteCache.get(img);
+
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  // Sample only the upper art area so parchment text boxes don't dominate.
+  const srcW = img.naturalWidth || img.width;
+  const srcH = img.naturalHeight || img.height;
+  const artX = srcW * 0.08;
+  const artY = srcH * 0.06;
+  const artW = srcW * 0.84;
+  const artH = srcH * 0.42;
+  ctx.drawImage(
+    img,
+    Math.floor(artX),
+    Math.floor(artY),
+    Math.max(1, Math.floor(artW)),
+    Math.max(1, Math.floor(artH)),
+    0,
+    0,
+    size,
+    size
+  );
+
+  const { data } = ctx.getImageData(0, 0, size, size);
+  const buckets = new Map();
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a < 180) continue;
+
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+    const sat = max === 0 ? 0 : (max - min) / max;
+
+    // Prefer mid-tone, colorful pixels for a usable theme hue.
+    if (lum < 0.1 || lum > 0.9 || sat < 0.1) continue;
+
+    r = (r >> 4) << 4;
+    g = (g >> 4) << 4;
+    b = (b >> 4) << 4;
+    const key = `${r},${g},${b}`;
+    const weight = 0.35 + sat * 0.65;
+    buckets.set(key, (buckets.get(key) || 0) + weight);
+  }
+
+  let bestKey = "122,150,168";
+  let bestScore = -1;
+  for (const [key, score] of buckets) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestKey = key;
+    }
+  }
+
+  const [r, g, b] = bestKey.split(",").map(Number);
+  const [pr, pg, pb] = softPastel(r, g, b, 0.58);
+  const [sr, sg, sb] = softPastel(r, g, b, 0.72);
+  const [tr, tg, tb] = softPastel(
+    Math.min(255, r + 18),
+    Math.min(255, g + 10),
+    Math.min(255, b + 6),
+    0.66
+  );
+  const [ir, ig, ib] = deepen(r, g, b, 0.48);
+  const [mr, mg, mb] = deepen(r, g, b, 0.28);
+
+  const palette = {
+    bgA: rgb(pr, pg, pb),
+    bgB: rgb(sr, sg, sb),
+    bgC: rgb(tr, tg, tb),
+    ink: rgb(ir, ig, ib),
+    muted: rgb(mr, mg, mb),
+    accent: rgb(r, g, b),
+    overlay: rgb(...deepen(r, g, b, 0.55), 0.44),
+  };
+
+  paletteCache.set(img, palette);
+  return palette;
+}
+
+function applyTheme(palette) {
+  root.style.setProperty("--bg-a", palette.bgA);
+  root.style.setProperty("--bg-b", palette.bgB);
+  root.style.setProperty("--bg-c", palette.bgC);
+  root.style.setProperty("--ink", palette.ink);
+  root.style.setProperty("--muted", palette.muted);
+  root.style.setProperty("--accent", palette.accent);
+  root.style.setProperty("--overlay", palette.overlay);
+}
+
+function fitCardFrame(img, slot, card) {
+  const srcW = img.naturalWidth;
+  const srcH = img.naturalHeight;
+  const ratio = `${srcW} / ${srcH}`;
+  slot.style.aspectRatio = ratio;
+  card.style.setProperty("--card-ratio", ratio);
+  // Keep the image flush to the frame — no letterbox bars.
+  img.style.objectFit = "cover";
+  img.style.objectPosition = "center center";
+}
+
+function buildGallery() {
+  const fragment = document.createDocumentFragment();
+
+  IMAGES.forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "card-slot";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card";
+    button.setAttribute("aria-label", `放大查看 ${item.alt}`);
+
+    const img = document.createElement("img");
+    img.src = item.src;
+    img.alt = item.alt;
+    img.loading = "eager";
+    img.decoding = "async";
+
+    img.addEventListener("load", () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        fitCardFrame(img, li, button);
+      }
+      const palette = extractPalette(img);
+      button.style.setProperty("--accent", palette.accent);
+      if (!activeCard) applyTheme(palette);
+    });
+
+    button.appendChild(img);
+    button.addEventListener("click", () => toggleCard(button));
+    button.addEventListener("mouseenter", () => {
+      if (activeCard || !img.complete) return;
+      applyTheme(extractPalette(img));
+    });
+
+    li.appendChild(button);
+    fragment.appendChild(li);
+  });
+
+  gallery.appendChild(fragment);
+}
+
+function openCard(card) {
+  const img = card.querySelector("img");
+  if (img?.complete) applyTheme(extractPalette(img));
+
+  const state = Flip.getState(card);
+  card.classList.add("is-open");
+  document.body.classList.add("is-lightbox");
+  overlay.classList.add("is-visible");
+  overlay.setAttribute("aria-hidden", "false");
+  activeCard = card;
+
+  Flip.from(state, {
+    duration: DURATION,
+    ease: EASE,
+    absolute: true,
+    nested: true,
+    onComplete: () => {
+      gsap.set(card, { clearProps: "transform" });
+      isAnimating = false;
+    },
+  });
+}
+
+function closeCard(card) {
+  const state = Flip.getState(card);
+  card.classList.remove("is-open");
+  document.body.classList.remove("is-lightbox");
+  overlay.classList.remove("is-visible");
+  overlay.setAttribute("aria-hidden", "true");
+
+  Flip.from(state, {
+    duration: DURATION,
+    ease: EASE,
+    absolute: true,
+    nested: true,
+    onComplete: () => {
+      gsap.set(card, { clearProps: "all" });
+      activeCard = null;
+      isAnimating = false;
+    },
+  });
+}
+
+function toggleCard(card) {
+  if (isAnimating) return;
+  isAnimating = true;
+
+  if (activeCard && activeCard !== card) {
+    const previous = activeCard;
+    const state = Flip.getState([previous, card]);
+    previous.classList.remove("is-open");
+    card.classList.add("is-open");
+    activeCard = card;
+
+    const img = card.querySelector("img");
+    if (img?.complete) applyTheme(extractPalette(img));
+
+    Flip.from(state, {
+      duration: DURATION,
+      ease: EASE,
+      absolute: true,
+      nested: true,
+      onComplete: () => {
+        gsap.set(card, { clearProps: "transform" });
+        gsap.set(previous, { clearProps: "all" });
+        isAnimating = false;
+      },
+    });
+    return;
+  }
+
+  if (activeCard === card) {
+    closeCard(card);
+    return;
+  }
+
+  openCard(card);
+}
+
+overlay.addEventListener("click", () => {
+  if (!activeCard || isAnimating) return;
+  isAnimating = true;
+  closeCard(activeCard);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !activeCard || isAnimating) return;
+  isAnimating = true;
+  closeCard(activeCard);
+});
+
+buildGallery();
