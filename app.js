@@ -12,6 +12,8 @@ const IMAGES = [
   { src: "photo/Clash Royale/Bowler.jpeg", alt: "Bowler", category: "Clash Royale" },
   { src: "photo/Clash Royale/Lightning.jpeg", alt: "Lightning", category: "Clash Royale" },
   { src: "photo/Clash Royale/Miner.jpeg", alt: "Miner", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Barbarian Barrel.jpeg", alt: "Barbarian Barrel", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Minions.jpeg", alt: "Minions", category: "Clash Royale" },
   { src: "photo/Original/fc.jpeg", alt: "FC", category: "Original" },
 ];
 
