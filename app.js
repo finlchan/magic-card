@@ -459,8 +459,141 @@ document.addEventListener("keydown", (event) => {
   closeCard(activeCard);
 });
 
+const GUESTBOOK_KEY = "magic-card-guestbook-v1";
+const guestbookForm = document.getElementById("guestbook-form");
+const favoriteSelect = document.getElementById("favorite-card");
+const guestbookList = document.getElementById("guestbook-list");
+const favoriteTally = document.getElementById("favorite-tally");
+
+function loadGuestbook() {
+  try {
+    const raw = localStorage.getItem(GUESTBOOK_KEY);
+    const data = raw ? JSON.parse(raw) : [];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveGuestbook(entries) {
+  localStorage.setItem(GUESTBOOK_KEY, JSON.stringify(entries.slice(0, 80)));
+}
+
+function fillFavoriteOptions() {
+  const fragment = document.createDocumentFragment();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "選擇最喜歡的卡片";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  fragment.appendChild(placeholder);
+
+  IMAGES.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.alt;
+    option.textContent = `${item.alt} (${item.category})`;
+    fragment.appendChild(option);
+  });
+
+  favoriteSelect.replaceChildren(fragment);
+}
+
+function formatTime(iso) {
+  try {
+    return new Intl.DateTimeFormat("zh-Hant", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+function renderFavoriteTally(entries) {
+  if (!entries.length) {
+    favoriteTally.innerHTML = "還沒有人投票，來選一張最喜歡的卡片吧。";
+    return;
+  }
+
+  const counts = new Map();
+  entries.forEach((entry) => {
+    counts.set(entry.favorite, (counts.get(entry.favorite) || 0) + 1);
+  });
+
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const [topCard, topCount] = ranked[0];
+  favoriteTally.innerHTML = `目前最受歡迎：<strong>${topCard}</strong>（${topCount}）`;
+}
+
+function renderGuestbook() {
+  const entries = loadGuestbook();
+  renderFavoriteTally(entries);
+  guestbookList.replaceChildren();
+
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "guestbook-empty";
+    empty.textContent = "尚無留言";
+    guestbookList.appendChild(empty);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const li = document.createElement("li");
+    li.className = "guestbook-item";
+
+    const meta = document.createElement("div");
+    meta.className = "guestbook-meta";
+    meta.innerHTML = `<span class="guest-name">${escapeHtml(entry.name)}</span><span class="guest-fav">❤ ${escapeHtml(entry.favorite)}</span><span>${escapeHtml(formatTime(entry.at))}</span>`;
+
+    const text = document.createElement("p");
+    text.className = "guestbook-text";
+    text.textContent = entry.message;
+
+    li.append(meta, text);
+    guestbookList.appendChild(li);
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function setupGuestbook() {
+  fillFavoriteOptions();
+  renderGuestbook();
+
+  guestbookForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = guestbookForm.name.value.trim();
+    const favorite = guestbookForm.favorite.value;
+    const message = guestbookForm.message.value.trim();
+    if (!name || !favorite || !message) return;
+
+    const entries = loadGuestbook();
+    entries.unshift({
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      name: name.slice(0, 24),
+      favorite,
+      message: message.slice(0, 160),
+      at: new Date().toISOString(),
+    });
+    saveGuestbook(entries);
+    guestbookForm.reset();
+    fillFavoriteOptions();
+    renderGuestbook();
+  });
+}
+
 if (typeof gsap === "undefined" || typeof Flip === "undefined") {
   console.error("GSAP Flip failed to load — lightbox disabled.");
 } else {
   buildGallery();
+  setupGuestbook();
 }

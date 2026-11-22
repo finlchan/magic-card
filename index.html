@@ -13,18 +13,48 @@
   <div class="page-bg" aria-hidden="true"></div>
   <div class="overlay" id="overlay" aria-hidden="true"></div>
 
-  <aside class="search-panel" aria-label="Card search">
-    <label class="search-field" for="search-input">
-      <span class="search-label">Search</span>
-      <input
-        id="search-input"
-        type="search"
-        placeholder="Search cards..."
-        autocomplete="off"
-        spellcheck="false"
-      />
-    </label>
-    <div class="category-filters" id="category-filters" role="group" aria-label="Categories"></div>
+  <aside class="side-panel" aria-label="Search and guestbook">
+    <section class="search-block">
+      <label class="search-field" for="search-input">
+        <span class="search-label">Search</span>
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search cards..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+      <div class="category-filters" id="category-filters" role="group" aria-label="Categories"></div>
+    </section>
+
+    <section class="guestbook" aria-label="Guestbook">
+      <h2 class="guestbook-title">留言板</h2>
+      <form class="guestbook-form" id="guestbook-form">
+        <label class="search-field" for="guest-name">
+          <span class="search-label">Name</span>
+          <input id="guest-name" name="name" type="text" maxlength="24" placeholder="Your name" required />
+        </label>
+        <label class="search-field" for="favorite-card">
+          <span class="search-label">最喜歡的卡片</span>
+          <select id="favorite-card" name="favorite" required></select>
+        </label>
+        <label class="search-field" for="guest-message">
+          <span class="search-label">Message</span>
+          <textarea
+            id="guest-message"
+            name="message"
+            rows="3"
+            maxlength="160"
+            placeholder="Leave a short note..."
+            required
+          ></textarea>
+        </label>
+        <button class="guestbook-submit" type="submit">送出留言</button>
+      </form>
+      <div class="favorite-tally" id="favorite-tally" aria-live="polite"></div>
+      <ul class="guestbook-list" id="guestbook-list"></ul>
+    </section>
   </aside>
 
   <main class="stage">
