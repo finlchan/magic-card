@@ -10,6 +10,8 @@ const IMAGES = [
   { src: "photo/Clash Royale/Rascals.jpeg", alt: "Rascals", category: "Clash Royale" },
   { src: "photo/Clash Royale/Bandit.jpeg", alt: "Bandit", category: "Clash Royale" },
   { src: "photo/Clash Royale/Bowler.jpeg", alt: "Bowler", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Lightning.jpeg", alt: "Lightning", category: "Clash Royale" },
+  { src: "photo/Clash Royale/Miner.jpeg", alt: "Miner", category: "Clash Royale" },
   { src: "photo/Original/fc.jpeg", alt: "FC", category: "Original" },
 ];
 
