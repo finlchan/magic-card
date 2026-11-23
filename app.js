@@ -16,6 +16,7 @@ const IMAGES = [
   { src: "photo/Clash Royale/Minions.jpeg", alt: "Minions", category: "Clash Royale" },
   { src: "photo/Original/fc.jpeg", alt: "FC", category: "Original" },
   { src: "photo/Original/fc2.jpeg", alt: "FC2", category: "Original" },
+  { src: "photo/Original/fc3.jpeg", alt: "FC3", category: "Original" },
 ];
 
 const DURATION = 0.55;
