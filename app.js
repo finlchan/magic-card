@@ -591,9 +591,29 @@ function setupGuestbook() {
   });
 }
 
+const SIDE_KEY = "magic-card-side-collapsed";
+const sideToggle = document.getElementById("side-toggle");
+
+function setSideCollapsed(collapsed) {
+  document.body.classList.toggle("side-collapsed", collapsed);
+  sideToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  sideToggle.title = collapsed ? "展開選單" : "收疊選單";
+  sideToggle.querySelector(".side-toggle-text").textContent = collapsed ? "展開" : "收疊";
+  localStorage.setItem(SIDE_KEY, collapsed ? "1" : "0");
+}
+
+function setupSidePanel() {
+  const saved = localStorage.getItem(SIDE_KEY) === "1";
+  setSideCollapsed(saved);
+  sideToggle.addEventListener("click", () => {
+    setSideCollapsed(!document.body.classList.contains("side-collapsed"));
+  });
+}
+
 if (typeof gsap === "undefined" || typeof Flip === "undefined") {
   console.error("GSAP Flip failed to load — lightbox disabled.");
 } else {
   buildGallery();
   setupGuestbook();
+  setupSidePanel();
 }
